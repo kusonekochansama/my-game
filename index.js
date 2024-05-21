@@ -5,6 +5,8 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const app = express();
+const port = process.env.PORT || 3000;
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -12,23 +14,32 @@ const pool = new Pool({
   }
 });
 
-app.get('/', (req, res) => {
-  res.send('Hello World!');
-});
+app.use(express.json());
 
 app.get('/api/highscores', async (req, res) => {
   try {
-    const client = await pool.connect();
-    const result = await client.query('SELECT * FROM highscores ORDER BY score DESC LIMIT 5');
+    const result = await pool.query('SELECT * FROM highscores');
     res.json(result.rows);
-    client.release();
   } catch (err) {
     console.error(err);
-    res.status(500).send('Server Error');
+    res.status(500).send('Server error');
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+app.post('/api/highscores', async (req, res) => {
+  const { name, score } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO highscores (name, score) VALUES ($1, $2) RETURNING *',
+      [name, score]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server error');
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
