@@ -26,18 +26,26 @@ client.connect()
   .then(() => {
     console.log('Table created or already exists.');
 
-    // 新しいスコアの挿入
-    return client.query(`
-      INSERT INTO highscores (name, score) VALUES
-      ('Alice', 100),
-      ('Bob', 200),
-      ('Charlie', 150),
-      ('Dave', 250);
-    `);
+    // データが既に存在するかを確認
+    return client.query('SELECT COUNT(*) FROM highscores');
+  })
+  .then(res => {
+    const count = parseInt(res.rows[0].count);
+    if (count === 0) {
+      // データが存在しない場合のみ挿入
+      console.log('Inserting initial data into the table.');
+      return client.query(`
+        INSERT INTO highscores (name, score) VALUES
+        ('Alice', 100),
+        ('Bob', 200),
+        ('Charlie', 150),
+        ('Dave', 250);
+      `);
+    } else {
+      console.log('Data already exists, skipping initial insert.');
+    }
   })
   .then(() => {
-    console.log('Inserted new scores.');
-
     // スコアの取得
     return client.query('SELECT * FROM highscores');
   })
