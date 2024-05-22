@@ -5,7 +5,7 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000; // 環境変数PORTを使用
 
 // CORS設定を追加
 app.use(cors({
