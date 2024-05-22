@@ -1,50 +1,51 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const { Pool } = require('pg');
+const { Client } = require('pg');
 require('dotenv').config();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// CORS設定を追加
-app.use(cors({
-    origin: 'http://nyandaru.starfree.jp' // 許可するオリジンを指定
-}));
-
-app.use(bodyParser.json());
-
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
+const client = new Client({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 });
 
-app.get('/api/highscores', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT name, score FROM highscores ORDER BY score DESC LIMIT 10');
-        res.json(result.rows);
-    } catch (err) {
-        console.error('Error fetching highscores:', err);
-        res.status(500).json({ error: 'Database query failed' });
-    }
-});
+client.connect()
+  .then(() => {
+    console.log('Connected to the database');
 
-app.post('/api/highscores', async (req, res) => {
-    const { name, score } = req.body;
-    console.log('Received POST request:', { name, score }); // デバッグログ追加
-    try {
-        const insertResult = await pool.query('INSERT INTO highscores (name, score) VALUES ($1, $2)', [name, score]);
-        console.log('Insert result:', insertResult); // デバッグログ追加
-        const result = await pool.query('SELECT name, score FROM highscores ORDER BY score DESC LIMIT 10');
-        res.json(result.rows);
-    } catch (err) {
-        console.error('Error inserting highscore:', err);
-        res.status(500).json({ error: 'Database query failed' });
-    }
-});
+    // テーブルの作成
+    return client.query(`
+      CREATE TABLE IF NOT EXISTS highscores (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(50) NOT NULL,
+        score INT NOT NULL
+      );
+    `);
+  })
+  .then(() => {
+    console.log('Table created or already exists.');
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+    // 新しいスコアの挿入
+    return client.query(`
+      INSERT INTO highscores (name, score) VALUES
+      ('Alice', 100),
+      ('Bob', 200),
+      ('Charlie', 150),
+      ('Dave', 250);
+    `);
+  })
+  .then(() => {
+    console.log('Inserted new scores.');
+
+    // スコアの取得
+    return client.query('SELECT * FROM highscores');
+  })
+  .then(res => {
+    console.log('Highscores:', res.rows);
+  })
+  .catch(err => {
+    console.error('Database operation error', err.stack);
+  })
+  .finally(() => {
+    client.end();
+  });
