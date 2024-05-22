@@ -5,7 +5,7 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000; // 環境変数PORTを使用
+const PORT = process.env.PORT || 3000;
 
 // CORS設定を追加
 app.use(cors({
@@ -26,19 +26,21 @@ app.get('/api/highscores', async (req, res) => {
         const result = await pool.query('SELECT name, score FROM highscores ORDER BY score DESC LIMIT 10');
         res.json(result.rows);
     } catch (err) {
-        console.error(err);
+        console.error('Error fetching highscores:', err);
         res.status(500).json({ error: 'Database query failed' });
     }
 });
 
 app.post('/api/highscores', async (req, res) => {
     const { name, score } = req.body;
+    console.log('Received POST request:', { name, score }); // デバッグログ追加
     try {
-        await pool.query('INSERT INTO highscores (name, score) VALUES ($1, $2)', [name, score]);
+        const insertResult = await pool.query('INSERT INTO highscores (name, score) VALUES ($1, $2)', [name, score]);
+        console.log('Insert result:', insertResult); // デバッグログ追加
         const result = await pool.query('SELECT name, score FROM highscores ORDER BY score DESC LIMIT 10');
         res.json(result.rows);
     } catch (err) {
-        console.error(err);
+        console.error('Error inserting highscore:', err);
         res.status(500).json({ error: 'Database query failed' });
     }
 });
