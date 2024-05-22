@@ -1,68 +1,49 @@
 const express = require('express');
-const { Client } = require('pg');
-require('dotenv').config();
-
+const cors = require('cors'); // 追加
+const { Pool } = require('pg');
 const app = express();
 const port = process.env.PORT || 3000;
 
-const client = new Client({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  ssl: { rejectUnauthorized: false } // SSL設定を追加
+app.use(cors()); // 追加
+
+// PostgreSQL接続設定
+const pool = new Pool({
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
-client.connect()
-  .then(() => {
-    console.log('Connected to the database');
-
-    // テーブルの作成
-    return client.query(`
-      CREATE TABLE IF NOT EXISTS highscores (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(50) NOT NULL,
-        score INT NOT NULL
-      );
-    `);
-  })
-  .then(() => {
-    console.log('Table created or already exists.');
-  })
-  .catch(err => {
-    console.error('Database operation error', err.stack);
-  });
-
-// ミドルウェア
 app.use(express.json());
 
-// ハイスコア取得エンドポイント
-app.get('/api/highscores', (req, res) => {
-  client.query('SELECT * FROM highscores ORDER BY score DESC LIMIT 10')
-    .then(result => {
-      res.json(result.rows);
-    })
-    .catch(err => {
-      console.error('Error executing query', err.stack);
-      res.status(500).send('Error fetching highscores');
-    });
+app.get('/api/highscores', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM highscores ORDER BY score DESC LIMIT 10');
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error executing query', err.stack);
+        res.status(500).json({ error: 'Database operation error' });
+    }
 });
 
-// ハイスコア追加エンドポイント
-app.post('/api/highscores', (req, res) => {
-  const { name, score } = req.body;
-  client.query('INSERT INTO highscores (name, score) VALUES ($1, $2) RETURNING *', [name, score])
-    .then(result => {
-      res.status(201).json(result.rows[0]);
-    })
-    .catch(err => {
-      console.error('Error executing query', err.stack);
-      res.status(500).send('Error adding highscore');
-    });
+app.post('/api/highscores', async (req, res) => {
+    const { name, score } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO highscores (name, score) VALUES ($1, $2) RETURNING *',
+            [name, score]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error executing query', err.stack);
+        res.status(500).json({ error: 'Database operation error' });
+    }
 });
 
-// サーバーの起動
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+    console.log(`Server running on port ${port}`);
 });
