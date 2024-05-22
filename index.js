@@ -1,5 +1,9 @@
+const express = require('express');
 const { Client } = require('pg');
 require('dotenv').config();
+
+const app = express();
+const port = process.env.PORT || 3000;
 
 const client = new Client({
   host: process.env.DB_HOST,
@@ -25,36 +29,40 @@ client.connect()
   })
   .then(() => {
     console.log('Table created or already exists.');
-
-    // データが既に存在するかを確認
-    return client.query('SELECT COUNT(*) FROM highscores');
-  })
-  .then(res => {
-    const count = parseInt(res.rows[0].count);
-    if (count === 0) {
-      // データが存在しない場合のみ挿入
-      console.log('Inserting initial data into the table.');
-      return client.query(`
-        INSERT INTO highscores (name, score) VALUES
-        ('Alice', 100),
-        ('Bob', 200),
-        ('Charlie', 150),
-        ('Dave', 250);
-      `);
-    } else {
-      console.log('Data already exists, skipping initial insert.');
-    }
-  })
-  .then(() => {
-    // スコアの取得
-    return client.query('SELECT * FROM highscores');
-  })
-  .then(res => {
-    console.log('Highscores:', res.rows);
   })
   .catch(err => {
     console.error('Database operation error', err.stack);
-  })
-  .finally(() => {
-    client.end();
   });
+
+// ミドルウェア
+app.use(express.json());
+
+// ハイスコア取得エンドポイント
+app.get('/api/highscores', (req, res) => {
+  client.query('SELECT * FROM highscores ORDER BY score DESC LIMIT 10')
+    .then(result => {
+      res.json(result.rows);
+    })
+    .catch(err => {
+      console.error('Error executing query', err.stack);
+      res.status(500).send('Error fetching highscores');
+    });
+});
+
+// ハイスコア追加エンドポイント
+app.post('/api/highscores', (req, res) => {
+  const { name, score } = req.body;
+  client.query('INSERT INTO highscores (name, score) VALUES ($1, $2) RETURNING *', [name, score])
+    .then(result => {
+      res.status(201).json(result.rows[0]);
+    })
+    .catch(err => {
+      console.error('Error executing query', err.stack);
+      res.status(500).send('Error adding highscore');
+    });
+});
+
+// サーバーの起動
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
